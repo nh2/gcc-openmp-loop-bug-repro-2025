@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package repro.proto;
+
+message V3 {
+    double x = 1;
+    double y = 2;
+    double z = 3;
+}
+
+message KeyPoint {
+    V3 color = 2;
+}
