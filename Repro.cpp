@@ -120,12 +120,84 @@ void reproFun() {
 
 }
 
+void reproFunSerial() {
+
+  const size_t N = 2;
+
+  cerr << std::setprecision (17); // to see all floats/doubles in full precision
+
+  cerr << endl << "Serial loop:" << endl;
+
+  vector<vector<std::array<float, 3>>> colors(N);
+  vector<vector<repro::proto::V3>> colorProtoV3s(N);
+  for (size_t i = 1; i < N; i++) {
+    vector<uint8_t> irrelevantContentsVector;
+    pushOneElemTo(irrelevantContentsVector);
+
+    for (size_t j = 0; j < irrelevantContentsVector.size(); j++) {
+      std::array<float, 3> color({ 0, 200000.0002 * i + j, 300000.0003 * i + j });
+      repro::proto::KeyPoint keypointProto;
+      repro::proto::V3* colorProto = keypointProto.mutable_color();
+      colorProto->set_x(color[2]);
+      colorProto->set_y(color[1]);
+      colorProto->set_z(0);
+      cerr << "i = " << i << " ; color = " << color[0] << "," << color[1] << "," << color[2]
+           << " ; colorProto = " << colorProto->x() << "," << colorProto->y() << "," << colorProto->z() << endl;
+      colors.at(i).push_back(color);
+      colorProtoV3s.at(i).push_back(*colorProto);
+    }
+  }
+
+}
+
+
+void reproFunParallel() {
+
+  const size_t N = 2;
+
+  cerr << std::setprecision (17); // to see all floats/doubles in full precision
+
+  cerr << endl << "Parallel loop:" << endl;
+
+  vector<vector<std::array<float, 3>>> colors(N);
+  vector<vector<repro::proto::V3>> colorProtoV3s(N);
+
+#pragma omp parallel for schedule(static, 1) // removing this pragma fixes the bug, even though the loop has only 1 iteration; same for changing the loop to run [0,1) instead of [1,2)
+  for (size_t i = 1; i < N; i++) {
+    vector<uint8_t> irrelevantContentsVector;
+    pushOneElemTo(irrelevantContentsVector);
+
+    for (size_t j = 0; j < irrelevantContentsVector.size(); j++) {
+      std::array<float, 3> color({ 0, 200000.0002 * i + j, 300000.0003 * i + j });
+      repro::proto::KeyPoint keypointProto;
+      repro::proto::V3* colorProto = keypointProto.mutable_color();
+      colorProto->set_x(color[2]);
+      colorProto->set_y(color[1]);
+      colorProto->set_z(0);
+      cerr << "i = " << i << " ; color = " << color[0] << "," << color[1] << "," << color[2]
+           << " ; colorProto = " << colorProto->x() << "," << colorProto->y() << "," << colorProto->z() << endl;
+      colors.at(i).push_back(color);
+      colorProtoV3s.at(i).push_back(*colorProto);
+    }
+  }
+
+}
+
 
 int main(int argc, const char* argv[]) {
   omp_set_dynamic(0);
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
   reproFun();
+
+  cerr << endl;
+  cerr << endl;
+  cerr << "separate invocations of equal functions, for assembly diffing:" << endl;
+
+  cerr << "reproFunSerial:" << endl;
+  reproFunSerial();
+  cerr << "reproFunParallel:" << endl;
+  reproFunParallel();
 
   return EXIT_SUCCESS;
 }
