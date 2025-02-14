@@ -31,30 +31,31 @@ bool reproFun() { // returns true if the bug exists
 
   cerr << endl << "Serial loop:" << endl;
 
-  vector<vector<std::array<float, 3>>> colors_serial(N);
-  vector<vector<repro::proto::V3>> colorProtoV3s_serial(N);
+  vector<vector<std::array<double, 3>>> colors_serial(N);
+
   for (size_t i = 1; i < N; i++) {
     vector<uint8_t> irrelevantContentsVector;
     pushOneElemTo(irrelevantContentsVector);
 
     for (size_t j = 0; j < irrelevantContentsVector.size(); j++) {
       std::array<float, 3> color({ 0, 200000.0002 * i + j, 300000.0003 * i + j });
-      repro::proto::KeyPoint keypointProto;
-      repro::proto::V3* colorProto = keypointProto.mutable_color();
-      colorProto->set_x(color[2]);
-      colorProto->set_y(color[1]);
-      colorProto->set_z(0);
+      if (false) { // enabling this print changes the values in `colors_serial`
+        cerr << "color = " << color[0] << "," << color[1] << "," << color[2] << endl;
+      }
+
+      std::array<double, 3> arr;
+      arr[0] = color[2];
+      arr[1] = color[1];
+      arr[2] = 0;
+      colors_serial.at(i).push_back(arr);
       cerr << "i = " << i << " ; color = " << color[0] << "," << color[1] << "," << color[2]
-           << " ; colorProto = " << colorProto->x() << "," << colorProto->y() << "," << colorProto->z() << endl;
-      colors_serial.at(i).push_back(color);
-      colorProtoV3s_serial.at(i).push_back(*colorProto);
+           << " ; arr = " << arr[0] << "," << arr[1] << "," << arr[2] << endl;
     }
   }
 
   cerr << endl << "Parallel loop:" << endl;
 
-  vector<vector<std::array<float, 3>>> colors_parallel(N);
-  vector<vector<repro::proto::V3>> colorProtoV3s_parallel(N);
+  vector<vector<std::array<double, 3>>> colors_parallel(N);
 
 #pragma omp parallel for schedule(static, 1) // removing this pragma fixes the bug, even though the loop has only 1 iteration; same for changing the loop to run [0,1) instead of [1,2)
   for (size_t i = 1; i < N; i++) {
@@ -70,18 +71,16 @@ bool reproFun() { // returns true if the bug exists
     // we know that this loop runs only 1 iteration (with `j = 0`) because `irrelevantContentsVector.size()` is 1; yet replacing the loop by just that fixes the bug.
     // size_t j = 0; {
       std::array<float, 3> color({ 0, 200000.0002 * i + j, 300000.0003 * i + j });
-      if (false) { // enabling this print fixes the bug
+      if (true) { // enabling this print fixes the bug
         cerr << "color = " << color[0] << "," << color[1] << "," << color[2] << endl;
       }
-      repro::proto::KeyPoint keypointProto;
-      repro::proto::V3* colorProto = keypointProto.mutable_color();
-      colorProto->set_x(color[2]); // commenting out either of these
-      colorProto->set_y(color[1]); // two lines fixes the bug
-      colorProto->set_z(0);
+      std::array<double, 3> arr;
+      arr[0] = color[2];
+      arr[1] = color[1];
+      arr[2] = 0;
+      colors_parallel.at(i).push_back(arr);
       cerr << "i = " << i << " ; color = " << color[0] << "," << color[1] << "," << color[2]
-          << " ; colorProto = " << colorProto->x() << "," << colorProto->y() << "," << colorProto->z() << endl;
-      colors_parallel.at(i).push_back(color);
-      colorProtoV3s_parallel.at(i).push_back(*colorProto);
+           << " ; arr = " << arr[0] << "," << arr[1] << "," << arr[2] << endl;
     }
   }
 
@@ -96,29 +95,9 @@ bool reproFun() { // returns true if the bug exists
 
   cerr << endl;
 
-  bool colorProtosSerialEqualsParallel = true;
-  for (size_t i = 0; i < colorProtoV3s_parallel.size(); i++) {
-    for (size_t j = 0; j < colorProtoV3s_parallel[i].size(); j++) {
-      const repro::proto::V3 s = colorProtoV3s_serial[i][j];
-      const repro::proto::V3 p = colorProtoV3s_parallel[i][j];
-      bool equal = (
-        s.x() == p.x() &&
-        s.y() == p.y() &&
-        s.z() == p.z()
-      );
-      colorProtosSerialEqualsParallel &= equal;
-      cerr
-           << "colorProtoV3s_serial   = [" << s.x() << "," << s.y() << "," << s.z() << "]\n"
-           << "colorProtoV3s_parallel = [" << p.x() << "," << p.y() << "," << p.z() << "]\n"
-           << "  equal = [" << (s.x() == p.x()) << "," << (s.y() == p.y()) << "," << (s.z() == p.z()) << "]" << endl;
-    }
-  }
+  cerr << "colors serial==parallel? = " << (colors_serial == colors_parallel) << endl;
 
-  cerr << endl;
-  cerr << "colors        serial==parallel? = " << (colors_serial == colors_parallel) << endl;
-  cerr << "colorProtoV3s serial==parallel? = " << colorProtosSerialEqualsParallel << endl;
-
-  bool hasBug = (colors_serial == colors_parallel) != colorProtosSerialEqualsParallel;
+  bool hasBug = (colors_serial != colors_parallel);
   return hasBug;
 }
 
@@ -192,14 +171,14 @@ int main(int argc, const char* argv[]) {
 
   bool hasBug = reproFun();
 
-  cerr << endl;
-  cerr << endl;
-  cerr << "separate invocations of equal functions, for assembly diffing:" << endl;
+  // cerr << endl;
+  // cerr << endl;
+  // cerr << "separate invocations of equal functions, for assembly diffing:" << endl;
 
-  cerr << "reproFunSerial:" << endl;
-  reproFunSerial();
-  cerr << "reproFunParallel:" << endl;
-  reproFunParallel();
+  // cerr << "reproFunSerial:" << endl;
+  // reproFunSerial();
+  // cerr << "reproFunParallel:" << endl;
+  // reproFunParallel();
 
   cerr << endl;
   cerr << "BUG? " << (hasBug ? "YES" : "no") << endl;
