@@ -63,7 +63,12 @@ colorProtoV3s_parallel = [300000.00030000001,200000.00020000001,0]
 
 colors        serial==parallel? = 1
 colorProtoV3s serial==parallel? = 0
+
+BUG? YES
 ```
+
+`BUG? YES` indicates the bug being present.
+
 
 * In the serial loop, the variable `color` when printed contains value `200000` but in the parallel loop it's `200000.00020000001`.
 * However, the same variable put into a vector is then only `20000` (for both serial and parallel).
@@ -74,3 +79,18 @@ colorProtoV3s serial==parallel? = 0
 * As a result, we also observe that the `colors` vector is equal across the 2 loops, but the `colorProtoV3s` vector is not.
 
 Maybe the bug is that the `double` -> `float` narrowing is somehow forgotten in the OpenMP loop?
+
+
+## Trying to reproduce without Nix's GCC
+
+When building with `g++-12` from Ubuntu 24.04, the bug seems to go away.
+
+`LD_LIBRARY_PATH` is set below to use Ubuntu's `libstdc++`, `libgomp.so`, and `libgcc_s.so`; otherwise `./repro` program would crash at load time with `Floating point exception`.
+
+But all other libraries (e.g. `protobuf`) are still loaded from their Nix store paths.
+
+```sh
+NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs/archive/b134951a4c9f3c995fd7be05f3243f8ecd65d798.tar.gz nix-shell shell.nix --run '/usr/bin/g++-12 -Wall -I. -fopenmp gen/Repro.pb.cc Repro.cpp $(pkg-config --cflags --libs protobuf) -o repro -std=c++20 -O2 && LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu ./repro'
+```
+
+This may potentially suggest that the problem occurs only with Nix's GCC.

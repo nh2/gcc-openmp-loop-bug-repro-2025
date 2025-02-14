@@ -16,7 +16,7 @@ void pushOneElemTo(vector<uint8_t> & featuresOut) {
   featuresOut.push_back(123);
 }
 
-void reproFun() {
+bool reproFun() { // returns true if the bug exists
 
   // Note: The code
   //     std::array<float, 3> color({ 0, 200000.0002 * i + j, 300000.0003 * i + j });
@@ -118,6 +118,8 @@ void reproFun() {
   cerr << "colors        serial==parallel? = " << (colors_serial == colors_parallel) << endl;
   cerr << "colorProtoV3s serial==parallel? = " << colorProtosSerialEqualsParallel << endl;
 
+  bool hasBug = (colors_serial == colors_parallel) != colorProtosSerialEqualsParallel;
+  return hasBug;
 }
 
 void reproFunSerial() {
@@ -188,7 +190,7 @@ int main(int argc, const char* argv[]) {
   omp_set_dynamic(0);
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-  reproFun();
+  bool hasBug = reproFun();
 
   cerr << endl;
   cerr << endl;
@@ -198,6 +200,9 @@ int main(int argc, const char* argv[]) {
   reproFunSerial();
   cerr << "reproFunParallel:" << endl;
   reproFunParallel();
+
+  cerr << endl;
+  cerr << "BUG? " << (hasBug ? "YES" : "no") << endl;
 
   return EXIT_SUCCESS;
 }
