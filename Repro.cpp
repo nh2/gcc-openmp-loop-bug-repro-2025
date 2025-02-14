@@ -75,8 +75,8 @@ bool reproFun() { // returns true if the bug exists
       }
       repro::proto::KeyPoint keypointProto;
       repro::proto::V3* colorProto = keypointProto.mutable_color();
-      colorProto->set_x(color[2]);
-      colorProto->set_y(color[1]);
+      colorProto->set_x(color[2]); // commenting out either of these
+      colorProto->set_y(color[1]); // two lines fixes the bug
       colorProto->set_z(0);
       cerr << "i = " << i << " ; color = " << color[0] << "," << color[1] << "," << color[2]
           << " ; colorProto = " << colorProto->x() << "," << colorProto->y() << "," << colorProto->z() << endl;

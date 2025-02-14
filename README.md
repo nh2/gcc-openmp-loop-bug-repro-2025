@@ -31,6 +31,12 @@ Why I'm reasonably sure this is a compiler bug:
 * The OpenMP loop has only 1 iteration. So data races are not really possible.
 * Bug gone when removing `-std=c++20`.
 * Bug gone when compiling with `-O1`, or adding `-fno-tree-slp-vectorize` to `-O2`.
+* Bug gone when commenting out _either_ of the two lines
+  ```c++
+  colorProto->set_x(color[2]);
+  colorProto->set_y(color[1]);
+  ```
+  This further supports the idea the bug has something to do with vectorization.
 * Bug gone with UBsan
 * Bug gone with Tsan
 * Bug gone with clang
