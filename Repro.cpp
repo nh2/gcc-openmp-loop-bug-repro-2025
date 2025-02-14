@@ -2,6 +2,7 @@
 #include <iomanip>
 #include <array>
 #include <vector>
+#include <cstdint>
 #include <omp.h>
 
 using namespace std;
