@@ -38,13 +38,13 @@ bool reproFun() { // returns true if the bug exists
     pushOneElemTo(irrelevantContentsVector);
 
     for (size_t j = 0; j < irrelevantContentsVector.size(); j++) {
-      std::array<float, 3> color({ 0, 200000.0002 * i + j, 300000.0003 * i + j });
-      if (false) { // enabling this print changes the values in `colors_serial`
+      std::array<float, 3> color({ 200000.0002 * i + j, 300000.0003 * i + j, 0 });
+      if (true) { // enabling this print changes the values in `colors_serial`
         cerr << "color = " << color[0] << "," << color[1] << "," << color[2] << endl;
       }
 
       std::array<double, 3> arr;
-      arr[0] = color[2];
+      arr[0] = color[0];
       arr[1] = color[1];
       arr[2] = 0;
       colors_serial.at(i).push_back(arr);
@@ -70,12 +70,12 @@ bool reproFun() { // returns true if the bug exists
     for (size_t j = 0; j < irrelevantContentsVector.size(); j++) {
     // we know that this loop runs only 1 iteration (with `j = 0`) because `irrelevantContentsVector.size()` is 1; yet replacing the loop by just that fixes the bug.
     // size_t j = 0; {
-      std::array<float, 3> color({ 0, 200000.0002 * i + j, 300000.0003 * i + j });
+      std::array<float, 3> color({ 200000.0002 * i + j, 300000.0003 * i + j, 0 });
       if (true) { // enabling this print fixes the bug
         cerr << "color = " << color[0] << "," << color[1] << "," << color[2] << endl;
       }
       std::array<double, 3> arr;
-      arr[0] = color[2];
+      arr[0] = color[0];
       arr[1] = color[1];
       arr[2] = 0;
       colors_parallel.at(i).push_back(arr);
@@ -140,8 +140,7 @@ void reproFunParallel() {
 
   cerr << endl << "Parallel loop:" << endl;
 
-  vector<vector<std::array<float, 3>>> colors(N);
-  vector<vector<repro::proto::V3>> colorProtoV3s(N);
+  vector<vector<std::array<double, 3>>> colors(N);
 
 #pragma omp parallel for schedule(static, 1) // removing this pragma fixes the bug, even though the loop has only 1 iteration; same for changing the loop to run [0,1) instead of [1,2)
   for (size_t i = 1; i < N; i++) {
@@ -149,16 +148,18 @@ void reproFunParallel() {
     pushOneElemTo(irrelevantContentsVector);
 
     for (size_t j = 0; j < irrelevantContentsVector.size(); j++) {
-      std::array<float, 3> color({ 0, 200000.0002 * i + j, 300000.0003 * i + j });
-      repro::proto::KeyPoint keypointProto;
-      repro::proto::V3* colorProto = keypointProto.mutable_color();
-      colorProto->set_x(color[2]);
-      colorProto->set_y(color[1]);
-      colorProto->set_z(0);
+      std::array<float, 3> color({ 200000.0002 * i + j, 300000.0003 * i + j, 0 });
+      if (false) { // enabling this print changes the values in `colors`
+        cerr << "color = " << color[0] << "," << color[1] << "," << color[2] << endl;
+      }
+
+      std::array<double, 3> arr;
+      arr[0] = color[0];
+      arr[1] = color[1];
+      arr[2] = 0;
+      colors.at(i).push_back(arr);
       cerr << "i = " << i << " ; color = " << color[0] << "," << color[1] << "," << color[2]
-           << " ; colorProto = " << colorProto->x() << "," << colorProto->y() << "," << colorProto->z() << endl;
-      colors.at(i).push_back(color);
-      colorProtoV3s.at(i).push_back(*colorProto);
+           << " ; arr = " << arr[0] << "," << arr[1] << "," << arr[2] << endl;
     }
   }
 
@@ -167,7 +168,6 @@ void reproFunParallel() {
 
 int main(int argc, const char* argv[]) {
   omp_set_dynamic(0);
-  GOOGLE_PROTOBUF_VERIFY_VERSION;
 
   bool hasBug = reproFun();
 
