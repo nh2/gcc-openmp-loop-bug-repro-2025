@@ -109,23 +109,25 @@ void reproFunSerial() {
 
   cerr << endl << "Serial loop:" << endl;
 
-  vector<vector<std::array<float, 3>>> colors(N);
-  vector<vector<repro::proto::V3>> colorProtoV3s(N);
+  vector<vector<std::array<double, 3>>> colors(N);
+
   for (size_t i = 1; i < N; i++) {
     vector<uint8_t> irrelevantContentsVector;
     pushOneElemTo(irrelevantContentsVector);
 
     for (size_t j = 0; j < irrelevantContentsVector.size(); j++) {
-      std::array<float, 3> color({ 0, 200000.0002 * i + j, 300000.0003 * i + j });
-      repro::proto::KeyPoint keypointProto;
-      repro::proto::V3* colorProto = keypointProto.mutable_color();
-      colorProto->set_x(color[2]);
-      colorProto->set_y(color[1]);
-      colorProto->set_z(0);
+      std::array<float, 3> color({ 200000.0002 * i + j, 300000.0003 * i + j, 0 });
+      if (true) { // enabling this print changes the values in `colors`
+        cerr << "color = " << color[0] << "," << color[1] << "," << color[2] << endl;
+      }
+
+      std::array<double, 3> arr;
+      arr[0] = color[0];
+      arr[1] = color[1];
+      arr[2] = 0;
+      colors.at(i).push_back(arr);
       cerr << "i = " << i << " ; color = " << color[0] << "," << color[1] << "," << color[2]
-           << " ; colorProto = " << colorProto->x() << "," << colorProto->y() << "," << colorProto->z() << endl;
-      colors.at(i).push_back(color);
-      colorProtoV3s.at(i).push_back(*colorProto);
+           << " ; arr = " << arr[0] << "," << arr[1] << "," << arr[2] << endl;
     }
   }
 
