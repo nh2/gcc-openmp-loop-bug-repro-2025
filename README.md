@@ -4,12 +4,10 @@ The code in `Repro.cpp` shows an apparent GCC miscompilation of an OpenMP `paral
 
 * I suspect that some `double`s that should be truncated to `float`s are not truncated in the OpenMP case.
 * The OpenMP loop has only 1 iteration.
-* It involves the use of `protobuf`, though I suspect it's probably independent of protobuf. But I could not minimise `protobuf` away and still have the repro work.
 
 Versions used:
 
 * `g++` 12.3.0
-* `protobuf` 24.4.0
 * Linux `x86_64`
 
 
@@ -31,11 +29,12 @@ Why I'm reasonably sure this is a compiler bug:
 * The OpenMP loop has only 1 iteration. So data races are not really possible.
 * Bug gone when removing `-std=c++20`.
 * Bug gone when compiling with `-O1`, or adding `-fno-tree-slp-vectorize` to `-O2`.
-* Bug gone when commenting out _either_ of the two lines
+* Bug gone when changing _either_ of the two lines
   ```c++
-  colorProto->set_x(color[2]);
-  colorProto->set_y(color[1]);
+  arr[0] = color[0];
+  arr[1] = color[1];
   ```
+  to `= 0` (nees to be done in the serial and parallel version equally).
   This further supports the idea the bug has something to do with vectorization.
 * Bug gone with UBsan
 * Bug gone with Tsan
@@ -55,20 +54,17 @@ Output:
 
 ```
 Serial loop:
-i = 1 ; color = 0,200000,300000 ; colorProto = 300000,200000,0
+color = 200000,300000,0
+i = 1 ; color = 200000,300000,0 ; arr = 200000,300000,0
 
 Parallel loop:
-i = 1 ; color = 0,200000.00020000001,300000.00030000001 ; colorProto = 300000.00030000001,200000.00020000001,0
+color = 200000,300000.00030000001,0
+i = 1 ; color = 200000,300000.00030000001,0 ; arr = 200000,300000.00030000001,0
 
-colors_parallel[1][0] = 0,200000,300000
-colors_serial  [1][0] = 0,200000,300000
+colors_parallel[1][0] = 200000.00020000001,300000.00030000001,0
+colors_serial  [1][0] = 200000,300000,0
 
-colorProtoV3s_serial   = [300000,200000,0]
-colorProtoV3s_parallel = [300000.00030000001,200000.00020000001,0]
-  equal = [0,0,1]
-
-colors        serial==parallel? = 1
-colorProtoV3s serial==parallel? = 0
+colors serial==parallel? = 0
 
 BUG? YES
 ```
@@ -76,27 +72,56 @@ BUG? YES
 `BUG? YES` indicates the bug being present.
 
 
-* In the serial loop, the variable `color` when printed contains value `200000` but in the parallel loop it's `200000.00020000001`.
-* However, the same variable put into a vector is then only `20000` (for both serial and parallel).
-  * See `colors_parallel[1][0]` and `colors_serial  [1][0]`.
-* But the same variable put into a proto is `200000.00020000001` again (only for parallel).
-  * See `colorProtoV3s_parallel`.
-* The above by itself already seems bugged.
-* As a result, we also observe that the `colors` vector is equal across the 2 loops, but the `colorProtoV3s` vector is not.
+* In the serial loop, the variable `color` when printed contains value `300000` but in the parallel loop it's `300000.00030000001`.
+  * There is an additional weirdness:
+    When changing from
+    ```c++
+    #if 0
+    void reproFunSerial() {
+    ```
+    to
+    ```c++
+    #if 1
+    void reproFunSerial() {
+    ```
+    then the above changes to `300000`.
+    That is even though `reproFunSerial()` is an unused function.
+* In the parallel loop, the output `color = 200000,300000.00030000001,0` is already weird:
+  Why does the `200000` get apparently narrowed to `float`, but the `300000.00030000001` has `double` precision?
+* But in `colors_parallel[1][0]` it's `double` precision again: `200000.00020000001`
+  * It is really weird that this happens only for 1 of multiple `array` elements.
+* `colors_parallel` and `colors_serial` do not match.
 
-Maybe the bug is that the `double` -> `float` narrowing is somehow forgotten in the OpenMP loop?
+Explanation guesses:
+
+* Maybe the bug is that the `double` -> `float` narrowing is somehow forgotten in the OpenMP loop?
+* Maybe it's a combination of "excess precision" (as covered by https://gcc.gnu.org/bugzilla/show_bug.cgi?id=323), OpenMP, and vectorization?
 
 
-## Trying to reproduce without Nix's GCC
+## Running on Ubuntu
 
 When building with `g++-12` from Ubuntu 24.04, the bug seems to go away.
 
-`LD_LIBRARY_PATH` is set below to use Ubuntu's `libstdc++`, `libgomp.so`, and `libgcc_s.so`; otherwise `./repro` program would crash at load time with `Floating point exception`.
-
-But all other libraries (e.g. `protobuf`) are still loaded from their Nix store paths.
-
-```sh
-NIX_PATH=nixpkgs=https://github.com/NixOS/nixpkgs/archive/b134951a4c9f3c995fd7be05f3243f8ecd65d798.tar.gz nix-shell shell.nix --run '/usr/bin/g++-12 -Wall -I. -fopenmp gen/Repro.pb.cc Repro.cpp $(pkg-config --cflags --libs protobuf) -o repro -std=c++20 -O2 && LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu ./repro'
+```
+Ubuntu GCC version:  g++-12 (Ubuntu 12.3.0-17ubuntu1) 12.3.0
+Nix    GCC version:  gcc (GCC) 12.3.0
 ```
 
-This may potentially suggest that the problem occurs only with Nix's GCC.
+Ubuntu output:
+
+```
+Serial loop:
+color = 200000,300000,0
+i = 1 ; color = 200000,300000,0 ; arr = 200000,300000,0
+
+Parallel loop:
+color = 200000,300000,0
+i = 1 ; color = 200000,300000,0 ; arr = 200000,300000,0
+
+colors_parallel[1][0] = 200000,300000,0
+colors_serial  [1][0] = 200000,300000,0
+
+colors serial==parallel? = 1
+
+BUG? no
+```

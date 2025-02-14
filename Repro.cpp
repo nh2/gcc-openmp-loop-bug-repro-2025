@@ -1,9 +1,8 @@
 #include <iostream>
 #include <iomanip>
 #include <array>
+#include <vector>
 #include <omp.h>
-
-#include <gen/Repro.pb.h>
 
 using namespace std;
 
@@ -74,9 +73,10 @@ bool reproFun() { // returns true if the bug exists
       if (true) { // enabling this print fixes the bug
         cerr << "color = " << color[0] << "," << color[1] << "," << color[2] << endl;
       }
+
       std::array<double, 3> arr;
-      arr[0] = color[0];
-      arr[1] = color[1];
+      arr[0] = color[0]; // setting out either of these two lines to `= 0`
+      arr[1] = color[1]; // here and in the serial version, makes the bug go away
       arr[2] = 0;
       colors_parallel.at(i).push_back(arr);
       cerr << "i = " << i << " ; color = " << color[0] << "," << color[1] << "," << color[2]
@@ -101,6 +101,13 @@ bool reproFun() { // returns true if the bug exists
   return hasBug;
 }
 
+// Enabling this unused function changes the results of output of unrelated code from
+//     Parallel loop:
+//     color = 200000,300000.00030000001,0
+// to
+//     Parallel loop:
+//     color = 200000,300000,0
+#if 0
 void reproFunSerial() {
 
   const size_t N = 2;
@@ -132,6 +139,7 @@ void reproFunSerial() {
   }
 
 }
+#endif
 
 
 void reproFunParallel() {
